@@ -30,6 +30,8 @@
     #define M_PI 3.1415926535897932384626433832795
 #endif
 
+constexpr unsigned int Dimension = 2;
+
 /*! \file hard_disc.cpp
 
   An example showing the use of AABB trees for simulating the dynamics
@@ -38,18 +40,85 @@
 */
 
 // FUNCTION PROTOTYPES
+// Compute the minimum image separation vector.
+void minimumImage(std::array<double, Dimension>& separation,
+    const std::array<bool, Dimension>& periodicity, const std::array<double, Dimension>& boxSize)
+{
+    for (unsigned int i=0;i<2;i++)
+    {
+        if (separation[i] < -0.5*boxSize[i])
+        {
+            separation[i] += periodicity[i]*boxSize[i];
+        }
+        else
+        {
+            if (separation[i] >= 0.5*boxSize[i])
+            {
+                separation[i] -= periodicity[i]*boxSize[i];
+            }
+        }
+    }
+}
+
 
 // Test whether two particles overlap.
-bool overlaps(std::vector<double>&, std::vector<double>&, const std::vector<bool>&, const std::vector<double>&, double);
+bool overlaps(std::array<double, Dimension>& position1,
+        std::array<double, Dimension>& position2,
+    const std::array<bool, Dimension>& periodicity,
+    const std::array<double, Dimension>& boxSize, double cutOff)
+{
+    // Calculate particle separation.
+    std::array<double, Dimension> separation;
+    separation[0] = position1[0] - position2[0];
+    separation[1] = position1[1] - position2[1];
 
-// Compute the minimum image separation vector.
-void minimumImage(std::vector<double>&, const std::vector<bool>&, const std::vector<double>&);
+    // Calculate minimum image separation.
+    minimumImage(separation, periodicity, boxSize);
+
+    double rSqd = separation[0]*separation[0] + separation[1]*separation[1];
+
+    if (rSqd < cutOff) return true;
+    else return false;
+}
 
 // Apply periodic boundary conditions.
-void periodicBoundaries(std::vector<double>&, const std::vector<bool>&, const std::vector<double>&);
+void periodicBoundaries(std::array<double, Dimension>& position,
+    const std::array<bool, Dimension>& periodicity, const std::array<double, Dimension>& boxSize)
+{
+    for (unsigned int i=0;i<2;i++)
+    {
+        if (position[i] < 0)
+        {
+            position[i] += periodicity[i]*boxSize[i];
+        }
+        else
+        {
+            if (position[i] >= boxSize[i])
+            {
+                position[i] -= periodicity[i]*boxSize[i];
+            }
+        }
+    }
+}
 
 // Append a particle configuration to a VMD xyz file.
-void printVMD(const std::string&, const std::vector<std::vector<double> >&, const std::vector<std::vector<double> >&);
+void printVMD(const std::string& fileName, const std::vector<std::array<double, Dimension> >& positionsSmall,
+    const std::vector<std::array<double, Dimension> >& positionsLarge)
+{
+    FILE *pFile;
+    pFile = fopen(fileName.c_str(), "a");
+
+    fprintf(pFile, "%lu\n\n", positionsSmall.size() + positionsLarge.size());
+    for (unsigned int i=0;i<positionsSmall.size();i++)
+        fprintf(pFile, "0 %lf %lf 0\n", positionsSmall[i][0], positionsSmall[i][1]);
+    for (unsigned int i=0;i<positionsLarge.size();i++)
+        fprintf(pFile, "1 %lf %lf 0\n", positionsLarge[i][0], positionsLarge[i][1]);
+
+    fclose(pFile);
+}
+
+
+
 
 // MAIN FUNCTION
 
@@ -69,7 +138,7 @@ int main(int argc, char** argv)
     /*      Set parameters, initialise variables and objects.        */
     /*****************************************************************/
 
-    unsigned int nSweeps = 100000;      // The number of Monte Carlo sweeps.
+    unsigned int nSweeps = 1000;      // The number of Monte Carlo sweeps.
     unsigned int sampleInterval = 100;  // The number of sweeps per sample.
     unsigned int nSmall = 1000;         // The number of small particles.
     unsigned int nLarge = 100;          // The number of large particles.
@@ -92,22 +161,22 @@ int main(int argc, char** argv)
     unsigned int format = std::floor(std::log10(nSamples));
 
     // Set the periodicity of the simulation box.
-    std::vector<bool> periodicity({true, true});
+    std::array<bool, Dimension> periodicity = {{true, true}};
 
     // Work out base length of simulation box.
     double baseLength = std::pow((M_PI*(nSmall*diameterSmall + nLarge*diameterLarge))/(4.0*density), 1.0/2.0);
-    std::vector<double> boxSize({baseLength, baseLength});
+    std::array<double, Dimension> boxSize = {baseLength, baseLength};
 
     // Initialise the random number generator.
     MersenneTwister rng;
 
     // Initialise the AABB trees.
-    aabb::Tree treeSmall(2, maxDisp, periodicity, boxSize, nSmall);
-    aabb::Tree treeLarge(2, maxDisp, periodicity, boxSize, nLarge);
+    aabb::Tree<Dimension> treeSmall(maxDisp, periodicity, boxSize, nSmall);
+    aabb::Tree<Dimension> treeLarge(maxDisp, periodicity, boxSize, nLarge);
 
     // Initialise particle position vectors.
-    std::vector<std::vector<double> > positionsSmall(nSmall, std::vector<double>(boxSize.size()));
-    std::vector<std::vector<double> > positionsLarge(nLarge, std::vector<double>(boxSize.size()));
+    std::vector<std::array<double, Dimension> > positionsSmall(nSmall);
+    std::vector<std::array<double, Dimension> > positionsLarge(nLarge);
 
     /*****************************************************************/
     /*             Generate the initial AABB trees.                  */
@@ -119,7 +188,7 @@ int main(int argc, char** argv)
     for (unsigned int i=0;i<nLarge;i++)
     {
         // Initialise the particle position vector.
-        std::vector<double> position(2);
+        std::array<double, Dimension> position;
 
         // Insert the first particle directly.
         if (i == 0)
@@ -143,11 +212,11 @@ int main(int argc, char** argv)
                 position[1] = boxSize[1]*rng();
 
                 // Compute lower and upper AABB bounds.
-                std::vector<double> lowerBound({position[0] - radiusLarge, position[1] - radiusLarge});
-                std::vector<double> upperBound({position[0] + radiusLarge, position[1] + radiusLarge});
+                std::array<double, Dimension> lowerBound = {position[0] - radiusLarge, position[1] - radiusLarge};
+                std::array<double, Dimension> upperBound = {position[0] + radiusLarge, position[1] + radiusLarge};
 
                 // Generate the AABB.
-                aabb::AABB aabb(lowerBound, upperBound);
+                aabb::AABB<Dimension> aabb(lowerBound, upperBound);
 
                 // Query AABB overlaps.
                 std::vector<unsigned int> particles = treeLarge.query(aabb);
@@ -186,7 +255,7 @@ int main(int argc, char** argv)
     for (unsigned int i=0;i<nSmall;i++)
     {
         // Initialise the particle position vector.
-        std::vector<double> position(2);
+        std::array<double, Dimension> position;
 
         // Initialise overlap flag.
         bool isOverlap = true;
@@ -199,11 +268,11 @@ int main(int argc, char** argv)
             position[1] = boxSize[1]*rng();
 
             // Compute lower and upper AABB bounds.
-            std::vector<double> lowerBound({position[0] - radiusSmall, position[1] - radiusSmall});
-            std::vector<double> upperBound({position[0] + radiusSmall, position[1] + radiusSmall});
+            std::array<double, Dimension> lowerBound = {position[0] - radiusSmall, position[1] - radiusSmall};
+            std::array<double, Dimension> upperBound = {position[0] + radiusSmall, position[1] + radiusSmall};
 
             // Generate the AABB.
-            aabb::AABB aabb(lowerBound, upperBound);
+            aabb::AABB<Dimension> aabb(lowerBound, upperBound);
 
             // First query AABB overlaps with the large particles.
             std::vector<unsigned int> particles = treeLarge.query(aabb);
@@ -291,10 +360,10 @@ int main(int argc, char** argv)
             if (particleType == 1) particle -= nSmall;
 
             // Initialise vectors.
-            std::vector<double> displacement(2);
-            std::vector<double> position(2);
-            std::vector<double> lowerBound(2);
-            std::vector<double> upperBound(2);
+            std::array<double, Dimension> displacement;
+            std::array<double, Dimension> position;
+            std::array<double, Dimension> lowerBound;
+            std::array<double, Dimension> upperBound;
 
             // Calculate the new particle position and displacement.
             if (particleType == 0)
@@ -322,7 +391,7 @@ int main(int argc, char** argv)
             upperBound[1] = position[1] + radius;
 
             // Generate the AABB.
-            aabb::AABB aabb(lowerBound, upperBound);
+            aabb::AABB<Dimension> aabb(lowerBound, upperBound);
 
             // Query AABB overlaps with small particles.
             std::vector<unsigned int> particles = treeSmall.query(aabb);
@@ -412,76 +481,4 @@ int main(int argc, char** argv)
     std::cout << "Done!\n";
 
     return (EXIT_SUCCESS);
-}
-
-// FUNCTION DEFINITIONS
-
-bool overlaps(std::vector<double>& position1, std::vector<double>& position2,
-    const std::vector<bool>& periodicity, const std::vector<double>& boxSize, double cutOff)
-{
-    // Calculate particle separation.
-    std::vector<double> separation;
-    separation.push_back(position1[0] - position2[0]);
-    separation.push_back(position1[1] - position2[1]);
-
-    // Calculate minimum image separation.
-    minimumImage(separation, periodicity, boxSize);
-
-    double rSqd = separation[0]*separation[0] + separation[1]*separation[1];
-
-    if (rSqd < cutOff) return true;
-    else return false;
-}
-
-void minimumImage(std::vector<double>& separation,
-    const std::vector<bool>& periodicity, const std::vector<double>& boxSize)
-{
-    for (unsigned int i=0;i<2;i++)
-    {
-        if (separation[i] < -0.5*boxSize[i])
-        {
-            separation[i] += periodicity[i]*boxSize[i];
-        }
-        else
-        {
-            if (separation[i] >= 0.5*boxSize[i])
-            {
-                separation[i] -= periodicity[i]*boxSize[i];
-            }
-        }
-    }
-}
-
-void periodicBoundaries(std::vector<double>& position,
-    const std::vector<bool>& periodicity, const std::vector<double>& boxSize)
-{
-    for (unsigned int i=0;i<2;i++)
-    {
-        if (position[i] < 0)
-        {
-            position[i] += periodicity[i]*boxSize[i];
-        }
-        else
-        {
-            if (position[i] >= boxSize[i])
-            {
-                position[i] -= periodicity[i]*boxSize[i];
-            }
-        }
-    }
-}
-
-void printVMD(const std::string& fileName, const std::vector<std::vector<double> >& positionsSmall,
-    const std::vector<std::vector<double> >& positionsLarge)
-{
-    FILE *pFile;
-    pFile = fopen(fileName.c_str(), "a");
-
-    fprintf(pFile, "%lu\n\n", positionsSmall.size() + positionsLarge.size());
-    for (unsigned int i=0;i<positionsSmall.size();i++)
-        fprintf(pFile, "0 %lf %lf 0\n", positionsSmall[i][0], positionsSmall[i][1]);
-    for (unsigned int i=0;i<positionsLarge.size();i++)
-        fprintf(pFile, "1 %lf %lf 0\n", positionsLarge[i][0], positionsLarge[i][1]);
-
-    fclose(pFile);
 }

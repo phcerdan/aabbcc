@@ -10,8 +10,11 @@ include(GNUInstallDirs) # Define CMAKE_INSTALL_xxx: LIBDIR, INCLUDEDIR
 option(AABBCC_BUILD_DEMOS "Build demos" OFF)
 mark_as_advanced(AABBCC_BUILD_DEMOS)
 
-add_library(aabbcc src/AABB.cc)
-set(aabbcc_include_dir src)
+add_library(aabbcc
+  src/AABB_3D.cpp
+  src/AABB_2D.cpp
+  )
+set(aabbcc_include_dir include)
 set(aabbcc_export_file "${PROJECT_BINARY_DIR}/aabbccTargets.cmake")
 
 target_include_directories(aabbcc PUBLIC
