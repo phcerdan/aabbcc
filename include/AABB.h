@@ -33,7 +33,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
-#include <map>
+#include <unordered_map>
 #include <stdexcept>
 #include <vector>
 
@@ -410,7 +410,7 @@ template <unsigned int Dimension> class Tree {
         insertLeaf(node);
 
         // Add the new particle to the map.
-        particleMap.insert(std::map<unsigned int, unsigned int>::value_type(
+        particleMap.insert(std::unordered_map<unsigned int, unsigned int>::value_type(
                 particle, node));
 
         // Store the particle index.
@@ -470,7 +470,7 @@ template <unsigned int Dimension> class Tree {
         insertLeaf(node);
 
         // Add the new particle to the map.
-        particleMap.insert(std::map<unsigned int, unsigned int>::value_type(
+        particleMap.insert(std::unordered_map<unsigned int, unsigned int>::value_type(
                 particle, node));
 
         // Store the particle index.
@@ -486,7 +486,7 @@ template <unsigned int Dimension> class Tree {
      */
     void removeParticle(unsigned int particle) {
         // Map iterator.
-        std::map<unsigned int, unsigned int>::iterator it;
+        std::unordered_map<unsigned int, unsigned int>::iterator it;
 
         // Find the particle.
         it = particleMap.find(particle);
@@ -586,7 +586,7 @@ template <unsigned int Dimension> class Tree {
                         std::array<double, Dimension> &upperBound,
                         bool alwaysReinsert = false) {
         // Map iterator.
-        std::map<unsigned int, unsigned int>::iterator it;
+        std::unordered_map<unsigned int, unsigned int>::iterator it;
 
         // Find the particle.
         it = particleMap.find(particle);
@@ -928,7 +928,7 @@ template <unsigned int Dimension> class Tree {
     std::array<double, Dimension> posMinImage;
 
     /// A map between particle and node indices.
-    std::map<unsigned int, unsigned int> particleMap;
+    std::unordered_map<unsigned int, unsigned int> particleMap;
 
     /// Does touching count as overlapping in tree queries?
     bool touchIsOverlap;
