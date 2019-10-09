@@ -746,7 +746,7 @@ template <unsigned int Dimension> class Tree {
     /*! \param particle
             The particle index.
      */
-    const AABB<Dimension> &getAABB(unsigned int particle) {
+    const AABB<Dimension> &getAABB(unsigned int particle) const {
         return nodes[particleMap.at(particle)].aabb;
     }
 
