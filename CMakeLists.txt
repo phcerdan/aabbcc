@@ -9,8 +9,11 @@ include(GNUInstallDirs) # Define CMAKE_INSTALL_xxx: LIBDIR, INCLUDEDIR
 
 option(AABBCC_BUILD_DEMOS "Build demos" OFF)
 mark_as_advanced(AABBCC_BUILD_DEMOS)
+option(AABBCC_WRAP_PYTHON "Create python wrapping (with pybind11)" OFF)
+mark_as_advanced(AABBCC_WRAP_PYTHON)
 
 add_library(aabbcc src/AABB.cc)
+set_property(TARGET aabbcc PROPERTY POSITION_INDEPENDENT_CODE ON) #-fPIC
 set(aabbcc_include_dir src)
 set(aabbcc_export_file "${PROJECT_BINARY_DIR}/aabbccTargets.cmake")
 
@@ -35,6 +38,24 @@ export( TARGETS aabbcc
 
 if(AABBCC_BUILD_DEMOS)
     add_subdirectory(demos)
+endif()
+if(AABBCC_WRAP_PYTHON)
+  # Fetch pybind11
+  include(FetchContent)
+  FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11
+    GIT_TAG v2.3
+    )
+  FetchContent_GetProperties(pybind11)
+  if(NOT pybind11_POPULATED)
+    FetchContent_Populate(pybind11)
+    add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
+  endif()
+
+  set(CMAKE_INSTALL_PYTHONLIBDIR aabbcc) # Install folder for python libs
+  set(CMAKE_BUILD_PYTHONLIBDIR ${PROJECT_BINARY_DIR}/aabbcc) # copy python libs at build time
+  add_subdirectory(python)
 endif()
 
 # Install targets and config files

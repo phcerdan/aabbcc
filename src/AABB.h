@@ -496,6 +496,49 @@ namespace aabb
          */
         bool minimumImage(std::vector<double>&, std::vector<double>&);
     };
+
+inline void print_aabb(const AABB& aabb, std::ostream & os, bool apply_tab = false) {
+    const auto len = aabb.lowerBound.size();
+    const std::string tab = apply_tab ? "\t" : "";
+    os << tab << "lowerBound: [";
+    for(size_t i = 0; i < len; i++){
+        os << tab << aabb.lowerBound[i];
+        if( len > 1 && i < len - 1) os << tab << ", ";
+    }
+    os << tab << "]" << std::endl;
+    os << tab << "upperBound: [";
+    for(size_t i = 0; i < len; i++){
+        os << tab << aabb.upperBound[i];
+        if( len > 1 && i < len - 1) os << tab << ", ";
+    }
+    os << tab << "]" << std::endl;
+    os << tab << "centre: [";
+    for(size_t i = 0; i < len; i++){
+        os << tab << aabb.centre[i];
+        if( len > 1 && i < len - 1) os << tab << ", ";
+    }
+    os << tab << "]" << std::endl;
+    os << tab << "surfaceArea: " << aabb.surfaceArea << std::endl;
+}
+
+
+inline void print_node(const Node& node, std::ostream & os) {
+    os << "aabb: " << std::endl;
+    const bool aabb_apply_indent = true;
+    print_aabb(node.aabb, os, aabb_apply_indent);
+    os << "parent: " << node.parent << std::endl;
+    os << "next: " << node.next << std::endl;
+    os << "left: " << node.left << std::endl;
+    os << "right: " << node.right << std::endl;
+    os << "height: " << node.height << std::endl;
+    os << "particle: " << node.particle << std::endl;
+    os << "isLeaf: " << (node.isLeaf() ? "yes" : "no") << std::endl;
+}
+
+inline void print_tree(const Tree& tree, std::ostream & os) {
+    std::cout << "Tree:" << std::endl;
+}
+
 }
 
 #endif /* _AABB_H */
